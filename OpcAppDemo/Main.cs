@@ -1,4 +1,18 @@
-﻿using Newtonsoft.Json;
+﻿///@说明
+///@开发环境：vs2015
+///@.Net framework版本：  4.5
+///@Opc相关库：OPCDAAuto.dll
+///@Nugget库：Newtonsoft.Json
+///@Opc服务模拟器：MatrikonOPC Server for Simulation，ICONICS Simulator OPC Server 3.12
+///@数据库sql文件：CreateTable.sql
+///
+///@完成时间：2016-5-1 12:24:48
+///
+///@作者：蓝色
+///@QQ：214909012
+///@Emnail：   214909012@qq.com
+///请保留原作者信息
+using Newtonsoft.Json;
 using OpcAppDemo.Common;
 using OpcAppDemo.Model;
 using OPCAutomation;
@@ -18,15 +32,35 @@ namespace OpcAppDemo
 {
     public partial class Main : Form
     {
+        /// <summary>
+        /// Opc-配置
+        /// </summary>
+        OpcJson mOpcJson = new OpcJson();
+
         public Main()
         {
             InitializeComponent();
         }
 
-        /// <summary>
-        /// Opc-配置
-        /// </summary>
-        OpcJson mOpcJson = new OpcJson();
+        #region 委托
+
+        public delegate void dele_txtTagValue(string text);
+
+        public delegate void dele_txtQualities(string text);
+
+        public delegate void dele_txtTimeStamps(string text);
+
+        public delegate void dele_rtxtRecord(string text);
+
+        dele_txtTagValue mdele_txtTagValue;
+
+        dele_txtQualities mdele_txtQualities;
+
+        dele_txtTimeStamps mdele_txtTimeStamps;
+
+        dele_rtxtRecord mdele_rtxtRecord;
+
+        #endregion
 
         #region 私有变量
         /// <summary>
@@ -83,6 +117,8 @@ namespace OpcAppDemo
             //判断Opc-配置文件是否存在
             if (File.Exists(filePath))
             {
+                this.rtxtRecord.Text = "";
+                this.rtxtRecordDb.Text = "";
                 // deserialize JSON directly from a file
                 using (StreamReader file = File.OpenText(filePath))
                 {
@@ -112,6 +148,7 @@ namespace OpcAppDemo
                 MessageBox.Show("Opc-配置不存在，请先配置！", "提示信息");
                 var opcConfig = new OpcConfig();
                 opcConfig.ShowDialog();
+                Init();
             }
         }
 
@@ -237,6 +274,27 @@ namespace OpcAppDemo
             opc_connected = false;
         }
 
+        /// <summary>
+        /// 订阅事件数据处理
+        /// </summary>
+        private void DataChange(object obj)
+        {
+            var dcm = obj as DataChangeModel;
+
+            //为了测试，所以加了控制台的输出，来查看事物ID号
+            //Console.WriteLine("********" + TransactionID.ToString() + "*********");
+            for (int i = 1; i <= dcm.NumItems; i++)
+            {
+                this.txtTagValue.Invoke(mdele_txtTagValue, new object[] { dcm.ItemValues.GetValue(i).ToString() });
+                this.txtQualities.Invoke(mdele_txtQualities, new object[] { dcm.Qualities.GetValue(i).ToString() });
+                this.txtTimeStamps.Invoke(mdele_txtTimeStamps, new object[] { dcm.TimeStamps.GetValue(i).ToString() });
+                string str1 = "Tag值：" + dcm.ItemValues.GetValue(i).ToString() + "\t";
+                string str2 = "品质：" + dcm.Qualities.GetValue(i).ToString() + "\t";
+                string str3 = "时间戳：" + dcm.TimeStamps.GetValue(i).ToString();
+                this.rtxtRecord.Invoke(mdele_rtxtRecord, new object[] { str1 + str2 + str3 + "\r\n" });
+            }
+        }
+
         #endregion
 
         #region opc事件
@@ -268,18 +326,16 @@ namespace OpcAppDemo
         /// <param name="TimeStamps">时间戳</param>
         void KepGroup_DataChange(int TransactionID, int NumItems, ref Array ClientHandles, ref Array ItemValues, ref Array Qualities, ref Array TimeStamps)
         {
-            //为了测试，所以加了控制台的输出，来查看事物ID号
-            //Console.WriteLine("********" + TransactionID.ToString() + "*********");
-            for (int i = 1; i <= NumItems; i++)
+            var obj = new DataChangeModel()
             {
-                this.txtTagValue.Text = ItemValues.GetValue(i).ToString();
-                this.txtQualities.Text = Qualities.GetValue(i).ToString();
-                this.txtTimeStamps.Text = TimeStamps.GetValue(i).ToString();
-                string str1 = "Tag值：" + ItemValues.GetValue(i).ToString() + "\t";
-                string str2 = "品质：" + Qualities.GetValue(i).ToString() + "\t";
-                string str3 = "时间戳：" + TimeStamps.GetValue(i).ToString();
-                this.rtxtRecord.Text += str1 + str2 + str3 + "\r\n";
-            }
+                TransactionID = TransactionID,
+                NumItems = NumItems,
+                ClientHandles = ClientHandles,
+                ItemValues = ItemValues,
+                Qualities = Qualities,
+                TimeStamps = TimeStamps
+            };
+            ThreadPool.QueueUserWorkItem(new WaitCallback(DataChange), obj);
         }
         #endregion
 
@@ -288,12 +344,29 @@ namespace OpcAppDemo
         private void Main_Load(object sender, EventArgs e)
         {
             KepServer = new OPCServer();
+            mdele_txtTagValue = delegate (string text)
+            {
+                this.txtTagValue.Text = text;
+            };
+            mdele_txtQualities = delegate (string text)
+            {
+                this.txtQualities.Text = text;
+            };
+            mdele_txtTimeStamps = delegate (string text)
+            {
+                this.txtTimeStamps.Text = text;
+            };
+            mdele_rtxtRecord = delegate (string text)
+            {
+                this.rtxtRecord.Text += text;
+            };
         }
 
         private void Main_FormClosing(object sender, FormClosingEventArgs e)
         {
             Disconnect();
         }
+
 
         private void tbtnInit_Click(object sender, EventArgs e)
         {
@@ -304,7 +377,9 @@ namespace OpcAppDemo
         {
             var opcConfig = new OpcConfig();
             opcConfig.ShowDialog();
+            Init();
         }
+
 
         private void btnWriteDb_Click(object sender, EventArgs e)
         {
@@ -395,7 +470,6 @@ namespace OpcAppDemo
             }
         }
 
-        #endregion
 
         private void listboxAlias_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -442,6 +516,13 @@ namespace OpcAppDemo
             this.rtxtRecord.Focus();
             int p = rtxtRecord.TextLength;
             rtxtRecord.Select(p - 2, p - 1);
+        }
+
+        #endregion
+
+        private void Main_Shown(object sender, EventArgs e)
+        {
+            Init();
         }
     }
 }

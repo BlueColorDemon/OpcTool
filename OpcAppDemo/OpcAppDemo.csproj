@@ -63,6 +63,7 @@
     <Compile Include="Main.Designer.cs">
       <DependentUpon>Main.cs</DependentUpon>
     </Compile>
+    <Compile Include="Model\DataChange.cs" />
     <Compile Include="Model\TagData.cs" />
     <Compile Include="Model\OpcJson.cs" />
     <Compile Include="OpcConfig.cs">
@@ -103,7 +104,9 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="DbOperation\CreateTable.sql" />
+    <Content Include="DbOperation\CreateTable.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="DLL\Interop.OPCAutomation.dll" />
     <Content Include="DLL\OPCDAAuto.dll" />
     <Content Include="Image\D-config.ico" />

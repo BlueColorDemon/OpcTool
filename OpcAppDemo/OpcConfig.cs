@@ -240,6 +240,7 @@ namespace OpcAppDemo
         private void OpcConfig_Load(object sender, EventArgs e)
         {
             GetLocalServer();
+            this.ControlBox = false;
         }
 
         private void btnRefreshLoacalServer_Click(object sender, EventArgs e)
